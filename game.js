@@ -3,13 +3,16 @@ import {MoveTowardsPoint} from "./API.js";
 const sprite_width = 64;
 const sprite_height = 64;
 
+const tile_width = 64;
+const tile_height = 64;
+
 const screen_width = 1600;
 const screen_height = 900;
 
 const enemy_speed = 0.25; // pixels per millisecond
 const enemy_drift_factor = 0.8;
 
-const player_speed = 0.3;
+const player_speed = 1000 * 0.5; // pixels per millisecond
 
 const center = {
     x: screen_width*0.5,
@@ -28,27 +31,44 @@ class Arena extends Phaser.Scene
     create ()
     {
 
-        // Load a blank map with a 32 x 32 px tile size. This is the base tile size. This means that
-        // tiles in the map will be placed on a 32 x 32 px grid.
-        const map = this.make.tilemap({ width: screen_width, height: screen_height, tileWidth: 64, tileHeight: 64 });
+        const map_width = Math.floor(2*screen_width/tile_width);
+        const map_height = Math.floor(2*screen_height/tile_height);
+        this.map = this.make.tilemap({ 
+            width: map_width, 
+            height: map_height, 
+            tileWidth: tile_width, tileHeight: tile_height 
+        });
 
-        // You can also change the base tile size of map like this:
-        // map.setBaseTileSize(32, 32);
+        const ground_tiles = this.map.addTilesetImage('ground_tiles', null, tile_width, tile_height);
+        const rock_tiles = this.map.addTilesetImage('rock_tiles', null,  tile_width, tile_height);
 
-        // Load a 32 x 64 px tileset. This tileset was designed to allow tiles to overlap vertically, so
-        // placing them on a 32 x 32 grid is exactly what we want.
-        const tiles = map.addTilesetImage('ground_tiles', null, 64, 64);
+        const ground_layer = this.map.createBlankLayer('ground_layer', ground_tiles);
+        ground_layer.setPosition(-screen_width, -screen_height);
+        ground_layer.fill(9);
+        //layer.randomize(0, 0, map.width, map.height, [...Array(16).keys()]);
 
-        // Create a layer filled with random trees
-        const layer = map.createBlankLayer('layer1', tiles);
+        this.boundary_layer = this.map.createBlankLayer('boundary_layer', rock_tiles);
+        this.boundary_layer.setPosition(-screen_width, -screen_height);
 
+        this.boundary_layer.fill(0, 0, 0, map_width, 1); // fill top row of map with rocks
+        this.boundary_layer.fill(0, 0, 0, 1, map_height); // fill left column of map with rocks
+        this.boundary_layer.fill(0, 0, map_height-1, map_width, map_height); // fill bottom row of map with rocks
+        this.boundary_layer.fill(0, map_width-1, 0, map_width, map_height); // fill right column of map with rocks
+        
+        //this.map.setCollisionByExclusion([0], false);
 
-        layer.randomize(0, 0, map.width, map.height, [...Array(16).keys()]);
+        //this.physics.add.existing(this.boundary_layer);
+        this.map.setCollision([0]);
+
+        this.debug_graphics = this.add.graphics();
+        //this.boundary_layer.renderDebug(this.debug_graphics);
 
         this.input.mouse.disableContextMenu();
 
         this.spawnPlayer();
-        this.spawnEnemies();
+
+        this.all_enemies = null;
+        //this.spawnEnemies();
         
     }
 
@@ -72,24 +92,25 @@ class Arena extends Phaser.Scene
 
     loadMapTiles(){
         this.load.image('ground_tiles', 'ground_tiles.png');
+        this.load.image('rock_tiles', 'rock_tile.png');
     }
 
     spawnEnemies(){
 
 
-        this.basic1 = this.add.sprite(100, 100, 'basic');
-        this.basic2 = this.add.sprite(screen_width-100, 100, 'basic');
-        this.basic3 = this.add.sprite(100, screen_height-100, 'basic');
-        this.basic4 = this.add.sprite(screen_width-100, screen_height-100, 'basic');
+        const basic1 = this.add.sprite(100, 100, 'basic');
+        const basic2 = this.add.sprite(screen_width-100, 100, 'basic');
+        const basic3 = this.add.sprite(100, screen_height-100, 'basic');
+        const basic4 = this.add.sprite(screen_width-100, screen_height-100, 'basic');
 
-        this.basic_pack = this.add.group();
-        this.basic_pack.add(this.basic1);
-        this.basic_pack.add(this.basic2);
-        this.basic_pack.add(this.basic3);
-        this.basic_pack.add(this.basic4);
+        this.all_enemies = this.add.group();
+        this.all_enemies.add(basic1);
+        this.all_enemies.add(basic2);
+        this.all_enemies.add(basic3);
+        this.all_enemies.add(basic4);
 
         // give enemies my easy motion function
-        for (let enemy of this.basic_pack.getChildren()){
+        for (let enemy of this.all_enemies.getChildren()){
             enemy.MoveTowardsPoint = MoveTowardsPoint;
         }
 
@@ -123,29 +144,47 @@ class Arena extends Phaser.Scene
     }
 
     spawnPlayer(){
-        this.player = this.add.sprite(center.x, center.y, 'player');
+        this.player = this.add.sprite(0, 0, 'player');
 
         // give the player my easy motion function
         this.player.MoveTowardsPoint = MoveTowardsPoint;
 
         // have camera start to follow player
         this.cameras.main.startFollow(this.player, true);
+
+        // turn physics on for the player
+        this.physics.add.existing(this.player);
+
+        // turn collision on between the player and boundaries
+        this.physics.add.collider(
+            this.player, 
+            this.boundary_layer,
+            //() => {console.log("Collision detected")}
+        );
     }
 
     handlePlayerInput(dt){
         const pointer = this.input.activePointer;
+        this.player.body.setVelocity(0);
+        
 
         if (pointer.leftButtonDown()){
             pointer.updateWorldPoint(this.cameras.main);
             this.player.MoveTowardsPoint(pointer.worldX, pointer.worldY, dt, player_speed);
-            console.log(pointer.worldX, pointer.worldY);
+            // this.physics.moveTo(
+            //     this.player, 
+            //     pointer.worldX, pointer.worldY,
+            //     player_speed
+            // )
             
         }
     }
 
     AI (dt){
 
-        for (let enemy of this.basic_pack.getChildren()){
+        if (this.all_enemies === null) return;
+
+        for (let enemy of this.all_enemies.getChildren()){
 
             let distance = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
 
@@ -168,7 +207,13 @@ var config = {
     parent: "container",
     pixelArt: true,
     scene: Arena,
-    backgroundColor: "#333"
+    backgroundColor: "#000",
+    physics:{
+        default: "arcade",
+        arcade: {
+            debug: true
+        }
+    }
 };
 
 var game = new Phaser.Game(config);
