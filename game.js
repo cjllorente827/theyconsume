@@ -9,10 +9,10 @@ const tile_height = 64;
 const screen_width = 1600;
 const screen_height = 900;
 
-const enemy_speed = 0.25; // pixels per millisecond
-const enemy_drift_factor = 0.8;
+const enemy_speed = 250; // pixels per second
+const enemy_drift_factor = 0.01;
 
-const player_speed = 1000 * 0.5; // pixels per millisecond
+const player_speed = 500; // pixels per second
 
 const center = {
     x: screen_width*0.5,
@@ -23,52 +23,56 @@ class Arena extends Phaser.Scene
 {
     preload ()
     {
-        this.load.setBaseURL('assets/tilesets');
-        this.loadMapTiles();
+        this.load.setBaseURL('assets');
+        //this.loadMapTiles();
         this.loadSprites();
+
+        this.load.image('ground_tiles', 'tilesets/ground_tiles.png');
+        this.load.tilemapTiledJSON('map', 'maps/ground_w_path.json');
     }
 
     create ()
     {
 
-        const map_width = Math.floor(2*screen_width/tile_width);
-        const map_height = Math.floor(2*screen_height/tile_height);
+        // const map_width = Math.floor(2*screen_width/tile_width);
+        // const map_height = Math.floor(2*screen_height/tile_height);
         this.map = this.make.tilemap({ 
-            width: map_width, 
-            height: map_height, 
-            tileWidth: tile_width, tileHeight: tile_height 
+            key: 'map',
+            tileWidth: tile_width, tileHeight: tile_height
         });
 
-        const ground_tiles = this.map.addTilesetImage('ground_tiles', null, tile_width, tile_height);
-        const rock_tiles = this.map.addTilesetImage('rock_tiles', null,  tile_width, tile_height);
+        this.tileset = this.map.addTilesetImage('ground_tiles');
+        this.layer = this.map.createLayer('layer1', this.tileset);
+        this.layer.setPosition(-screen_width, -screen_height);
 
-        const ground_layer = this.map.createBlankLayer('ground_layer', ground_tiles);
-        ground_layer.setPosition(-screen_width, -screen_height);
-        ground_layer.fill(9);
-        //layer.randomize(0, 0, map.width, map.height, [...Array(16).keys()]);
+        this.map.setCollision([5]);
 
-        this.boundary_layer = this.map.createBlankLayer('boundary_layer', rock_tiles);
-        this.boundary_layer.setPosition(-screen_width, -screen_height);
+        // const ground_tiles = this.map.addTilesetImage('ground_tiles', null, tile_width, tile_height);
+        // const rock_tiles = this.map.addTilesetImage('rock_tiles', null,  tile_width, tile_height);
 
-        this.boundary_layer.fill(0, 0, 0, map_width, 1); // fill top row of map with rocks
-        this.boundary_layer.fill(0, 0, 0, 1, map_height); // fill left column of map with rocks
-        this.boundary_layer.fill(0, 0, map_height-1, map_width, map_height); // fill bottom row of map with rocks
-        this.boundary_layer.fill(0, map_width-1, 0, map_width, map_height); // fill right column of map with rocks
+        // const ground_layer = this.map.createBlankLayer('ground_layer', ground_tiles);
+        // ground_layer.setPosition(-screen_width, -screen_height);
+        // ground_layer.fill(9);
+        // //layer.randomize(0, 0, map.width, map.height, [...Array(16).keys()]);
+
+        // this.boundary_layer = this.map.createBlankLayer('boundary_layer', rock_tiles);
+        // this.boundary_layer.setPosition(-screen_width, -screen_height);
+
+        // this.boundary_layer.fill(0, 0, 0, map_width, 1); // fill top row of map with rocks
+        // this.boundary_layer.fill(0, 0, 0, 1, map_height); // fill left column of map with rocks
+        // this.boundary_layer.fill(0, 0, map_height-1, map_width, map_height); // fill bottom row of map with rocks
+        // this.boundary_layer.fill(0, map_width-1, 0, map_width, map_height); // fill right column of map with rocks
         
-        //this.map.setCollisionByExclusion([0], false);
-
-        //this.physics.add.existing(this.boundary_layer);
-        this.map.setCollision([0]);
 
         this.debug_graphics = this.add.graphics();
-        //this.boundary_layer.renderDebug(this.debug_graphics);
+        this.layer.renderDebug(this.debug_graphics);
 
         this.input.mouse.disableContextMenu();
 
         this.spawnPlayer();
 
         this.all_enemies = null;
-        //this.spawnEnemies();
+        this.spawnEnemies();
         
     }
 
@@ -82,8 +86,8 @@ class Arena extends Phaser.Scene
 
     loadSprites(){
         
-        this.load.spritesheet('basic', 'maw.png', { frameWidth: sprite_width, frameHeight: sprite_height});
-        this.load.spritesheet('player', 'player.png', { frameWidth: sprite_width, frameHeight: sprite_height });
+        this.load.spritesheet('basic', 'tilesets/maw.png', { frameWidth: sprite_width, frameHeight: sprite_height});
+        this.load.spritesheet('player', 'tilesets/player.png', { frameWidth: sprite_width, frameHeight: sprite_height });
         // this.load.spritesheet('tank', 'enemy_tank.png', { frameWidth: sprite_width, frameHeight: sprite_height });
         // this.load.spritesheet('mage', 'enemy_mage.png', { frameWidth: sprite_width, frameHeight: sprite_height });
         // this.load.spritesheet('healer', 'enemy_healer.png', { frameWidth: sprite_width, frameHeight: sprite_height });
@@ -91,8 +95,11 @@ class Arena extends Phaser.Scene
     }
 
     loadMapTiles(){
+        // this.load.image('ground_tiles', 'ground_tiles.tsx');
+        // this.load.image('rock_tiles', 'rock_tile.tsx');
+
         this.load.image('ground_tiles', 'ground_tiles.png');
-        this.load.image('rock_tiles', 'rock_tile.png');
+        this.load.tilemapTiledJSON('map', '../maps/ground_w_path.json');
     }
 
     spawnEnemies(){
@@ -109,37 +116,20 @@ class Arena extends Phaser.Scene
         this.all_enemies.add(basic3);
         this.all_enemies.add(basic4);
 
-        // give enemies my easy motion function
         for (let enemy of this.all_enemies.getChildren()){
-            enemy.MoveTowardsPoint = MoveTowardsPoint;
+            this.physics.add.existing(enemy);
+            
         }
 
-        // this.basic_pack = this.add.group({
-        //     classType: Phaser.GameObjects.Sprite, 
-        //     key: 'basic', 
-        //     frame: 0, 
-        //     repeat: 10, 
-        //     setXY: { 
-        //         x: 500, 
-        //         y: 100, 
-        //         stepX: 0, 
-        //         stepY: 100
-        //     } 
-        // });
+        this.physics.add.collider(
+            this.all_enemies, 
+            this.layer
+        );
 
-        // const tank_mage_pack = this.add.group([
-        //     { 
-        //         classType: Phaser.GameObjects.Sprite, 
-        //         key: 'tank', frame: 0, repeat: 10, 
-        //         setXY: { x: 100, y: 170, stepX: 70 } 
-        //     },
-        //     { classType: Phaser.GameObjects.Sprite, 
-        //         key: 'mage', frame: 0, repeat: 10, 
-        //         setXY: { x: 100, y: 170 + 70, stepX: 70 } 
-        //     }
-        // ]);
-
-        
+        this.physics.add.collider(
+            this.all_enemies, 
+            this.all_enemies
+        );
 
     }
 
@@ -158,7 +148,7 @@ class Arena extends Phaser.Scene
         // turn collision on between the player and boundaries
         this.physics.add.collider(
             this.player, 
-            this.boundary_layer,
+            this.layer,
             //() => {console.log("Collision detected")}
         );
     }
@@ -170,12 +160,12 @@ class Arena extends Phaser.Scene
 
         if (pointer.leftButtonDown()){
             pointer.updateWorldPoint(this.cameras.main);
-            this.player.MoveTowardsPoint(pointer.worldX, pointer.worldY, dt, player_speed);
-            // this.physics.moveTo(
-            //     this.player, 
-            //     pointer.worldX, pointer.worldY,
-            //     player_speed
-            // )
+            //this.player.MoveTowardsPoint(pointer.worldX, pointer.worldY, dt, player_speed);
+            this.physics.moveTo(
+                this.player, 
+                pointer.worldX, pointer.worldY,
+                player_speed
+            )
             
         }
     }
@@ -190,12 +180,15 @@ class Arena extends Phaser.Scene
 
             if (distance > sprite_width) {
 
-                enemy.MoveTowardsPoint(this.player.x, this.player.y, dt, enemy_speed);
+                this.physics.moveTo(enemy, this.player.x, this.player.y, enemy_speed);
+                //enemy.MoveTowardsPoint(this.player.x, this.player.y, dt, enemy_speed);
             }
 
             // add some random drift to enemy motion
-            enemy.x += (2*Math.random() - 1) * enemy_speed * enemy_drift_factor ;
-            enemy.y += (2*Math.random() - 1) * enemy_speed * enemy_drift_factor ;
+            // enemy.x += (2*Math.random() - 1)  * enemy_drift_factor ;
+            // enemy.y += (2*Math.random() - 1)  * enemy_drift_factor ;
+            
+            enemy.setOrigin((2*Math.random() - 1)*enemy_drift_factor, (2*Math.random() - 1)*enemy_drift_factor);   
         }
     }
 }
@@ -205,13 +198,12 @@ var config = {
     width: screen_width,
     height: screen_height,
     parent: "container",
-    pixelArt: true,
     scene: Arena,
     backgroundColor: "#000",
     physics:{
         default: "arcade",
         arcade: {
-            debug: true
+            debug: false
         }
     }
 };
