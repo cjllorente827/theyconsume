@@ -14,8 +14,11 @@ export function MoveTowardsPoint(x, y, dt, speed=-1){
     let vel_x = this.speed * unit.x;
     let vel_y = this.speed * unit.y;
 
-    this.x += vel_x * dt;
-    this.y += vel_y * dt;
+    this.setVelocityX(vel_x);
+    this.setVelocityY(vel_y);
+
+    // this.x += vel_x * dt;
+    // this.y += vel_y * dt;
 
     
 
